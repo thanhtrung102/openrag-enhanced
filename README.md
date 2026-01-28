@@ -53,18 +53,15 @@ openrag-enhanced/
 │   │   └── hallucination.py          # PR #1: API endpoints
 │   └── ui/
 │       └── evaluation_dashboard/     # PR #3: Dashboard
-│           ├── app.py
-│           └── requirements.txt
+│           └── app.py
 ├── automatic-evaluation-pipeline/
 │   └── benchmark_enhanced.py         # PR #2: Benchmark integration
 ├── sql/
 │   └── init_evaluation.sql           # PR #2: PostgreSQL schema
-├── tests/
-│   ├── test_hallucination.py         # PR #1: Unit tests
-│   ├── test_graph_rag.py             # PR #4: Graph RAG tests
-│   └── test_agentic_rag.py           # PR #5: Agentic RAG tests
-├── scripts/
-│   └── run_tests.py                  # Test runner
+├── tests/                            # All unit tests
+│   ├── test_hallucination.py         # PR #1 tests
+│   ├── test_graph_rag.py             # PR #4 tests
+│   └── test_agentic_rag.py           # PR #5 tests
 ├── requirements.txt
 └── requirements-eval.txt
 ```
@@ -141,7 +138,7 @@ Features:
 Knowledge graph-enhanced RAG using Neo4j for entity storage and graph-based retrieval.
 
 ```python
-from openrag.components.graph import EntityExtractor, GraphStore, GraphRetriever
+from openrag.components.graph import EntityExtractor, GraphStore, GraphRetriever, RetrievalMode
 
 # Extract entities from documents
 extractor = EntityExtractor()
@@ -232,18 +229,50 @@ cd openrag-enhanced
 # Install
 pip install -r requirements.txt
 pip install -r requirements-eval.txt
-
-# Test
-pytest tests/ -v
-
-# Dashboard (demo mode)
-streamlit run openrag/ui/evaluation_dashboard/app.py
 ```
 
-### Neo4j Setup (for PR #4)
+---
+
+## Testing
+
+All tests are in the `tests/` directory. Run with pytest:
 
 ```bash
-# Using Docker
+# Run all tests
+pytest tests/ -v
+
+# Run with coverage report
+pytest tests/ --cov=openrag --cov-report=html
+```
+
+### Test by PR
+
+| PR | Test Command |
+|----|--------------|
+| PR #1: Hallucination Detection | `pytest tests/test_hallucination.py -v` |
+| PR #2: Evaluation Persistence | Requires PostgreSQL (see setup below) |
+| PR #3: Evaluation Dashboard | `streamlit run openrag/ui/evaluation_dashboard/app.py` |
+| PR #4: Graph RAG | `pytest tests/test_graph_rag.py -v` |
+| PR #5: Agentic RAG | `pytest tests/test_agentic_rag.py -v` |
+
+### PostgreSQL Setup (PR #2)
+
+```bash
+# Start PostgreSQL with Docker
+docker run -d --name postgres \
+    -e POSTGRES_PASSWORD=password \
+    -e POSTGRES_DB=openrag_eval \
+    -p 5432:5432 \
+    postgres:15
+
+# Initialize schema
+psql -h localhost -U postgres -d openrag_eval -f sql/init_evaluation.sql
+```
+
+### Neo4j Setup (PR #4)
+
+```bash
+# Start Neo4j with Docker
 docker run -d --name neo4j \
     -p 7474:7474 -p 7687:7687 \
     -e NEO4J_AUTH=neo4j/password \
