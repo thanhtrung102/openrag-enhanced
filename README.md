@@ -1,4 +1,4 @@
-# OpenRAG Contributions: Hallucination Detection & Evaluation
+# OpenRAG Contributions: Enhanced RAG Capabilities
 
 > **Proposed contributions to [linagora/openrag](https://github.com/linagora/openrag)**
 
@@ -14,15 +14,15 @@ This repository contains proposed contributions to Linagora's OpenRAG framework,
 | No explicit hallucination detection | Multi-method hallucination detector | PR #1 |
 | Evaluation results not persisted | PostgreSQL storage | PR #2 |
 | No visual metrics dashboard | Streamlit evaluation UI | PR #3 |
-| No Graph RAG | Neo4j integration | PR #4 (planned) |
-| No Agentic RAG | Multi-step workflows | PR #5 (planned) |
+| No Graph RAG | Neo4j knowledge graph integration | PR #4 |
+| No Agentic RAG | Multi-step workflows with tools | PR #5 |
 
 ### What OpenRAG Already Has (Not Duplicated)
 
-- ✅ Retrieval metrics (Hit Rate, MRR, NDCG, Recall)
-- ✅ LLM-as-Judge (Completion & Precision scoring)
-- ✅ Ground truth Q&A generation
-- ✅ System monitoring endpoints
+- Retrieval metrics (Hit Rate, MRR, NDCG, Recall)
+- LLM-as-Judge (Completion & Precision scoring)
+- Ground truth Q&A generation
+- System monitoring endpoints
 
 ---
 
@@ -32,11 +32,21 @@ This repository contains proposed contributions to Linagora's OpenRAG framework,
 openrag-enhanced/
 ├── openrag/                          # Files for linagora/openrag PRs
 │   ├── components/
-│   │   └── hallucination/            # PR #1: Hallucination Detection
+│   │   ├── hallucination/            # PR #1: Hallucination Detection
+│   │   │   ├── __init__.py
+│   │   │   ├── detector.py
+│   │   │   ├── nli_checker.py
+│   │   │   └── alignment_checker.py
+│   │   ├── graph/                    # PR #4: Graph RAG
+│   │   │   ├── __init__.py
+│   │   │   ├── entity_extractor.py
+│   │   │   ├── graph_store.py
+│   │   │   └── graph_retriever.py
+│   │   └── agents/                   # PR #5: Agentic RAG
 │   │       ├── __init__.py
-│   │       ├── detector.py
-│   │       ├── nli_checker.py
-│   │       └── alignment_checker.py
+│   │       ├── orchestrator.py
+│   │       ├── planner.py
+│   │       └── tools.py
 │   ├── storage/                      # PR #2: Metrics Persistence
 │   │   └── evaluation_store.py
 │   ├── routers/
@@ -50,7 +60,9 @@ openrag-enhanced/
 ├── sql/
 │   └── init_evaluation.sql           # PR #2: PostgreSQL schema
 ├── tests/
-│   └── test_hallucination.py         # PR #1: Unit tests
+│   ├── test_hallucination.py         # PR #1: Unit tests
+│   ├── test_graph_rag.py             # PR #4: Graph RAG tests
+│   └── test_agentic_rag.py           # PR #5: Agentic RAG tests
 ├── scripts/
 │   └── run_tests.py                  # Test runner
 ├── requirements.txt
@@ -122,6 +134,94 @@ Features:
 
 ---
 
+## PR #4: Graph RAG
+
+**Location:** `openrag/components/graph/`
+
+Knowledge graph-enhanced RAG using Neo4j for entity storage and graph-based retrieval.
+
+```python
+from openrag.components.graph import EntityExtractor, GraphStore, GraphRetriever
+
+# Extract entities from documents
+extractor = EntityExtractor()
+result = extractor.extract(
+    text="Python was created by Guido van Rossum at CWI.",
+    document_id="doc_123"
+)
+
+# Store in Neo4j
+store = GraphStore(uri="bolt://localhost:7687")
+await store.connect()
+await store.add_extraction_result(result)
+
+# Graph-enhanced retrieval
+retriever = GraphRetriever(
+    graph_store=store,
+    entity_extractor=extractor,
+)
+results = await retriever.retrieve(
+    query="Who created Python?",
+    mode=RetrievalMode.GRAPH_ENHANCED,
+)
+```
+
+Features:
+- Entity extraction with spaCy NER and custom patterns
+- Relationship extraction using dependency parsing
+- Neo4j-based knowledge graph storage
+- Hybrid vector + graph retrieval
+- Multi-hop graph traversal for context
+
+---
+
+## PR #5: Agentic RAG
+
+**Location:** `openrag/components/agents/`
+
+Multi-step RAG workflows with planning, tool calling, and iterative refinement.
+
+```python
+from openrag.components.agents import (
+    AgenticRAGOrchestrator,
+    QueryPlanner,
+    CalculatorTool,
+    WebSearchTool,
+)
+
+# Create tools
+tools = [CalculatorTool(), WebSearchTool()]
+
+# Create planner
+planner = QueryPlanner(llm_client=llm)
+
+# Create orchestrator
+orchestrator = AgenticRAGOrchestrator(
+    llm_client=llm,
+    retriever=retriever,
+    planner=planner,
+    tools=tools,
+)
+
+# Run complex query
+result = await orchestrator.run(
+    query="Compare Python and Rust performance for web servers"
+)
+
+print(f"Answer: {result.answer}")
+print(f"Confidence: {result.confidence}")
+print(f"Steps taken: {len(result.steps)}")
+```
+
+Features:
+- Query complexity analysis and planning
+- Multi-step execution with intermediate reasoning
+- Built-in tools: Calculator, Web Search, Code Executor, DateTime
+- Self-reflection and answer refinement
+- Execution tracing for debugging
+
+---
+
 ## Local Development
 
 ```bash
@@ -134,10 +234,20 @@ pip install -r requirements.txt
 pip install -r requirements-eval.txt
 
 # Test
-python scripts/run_tests.py --quick
+pytest tests/ -v
 
 # Dashboard (demo mode)
 streamlit run openrag/ui/evaluation_dashboard/app.py
+```
+
+### Neo4j Setup (for PR #4)
+
+```bash
+# Using Docker
+docker run -d --name neo4j \
+    -p 7474:7474 -p 7687:7687 \
+    -e NEO4J_AUTH=neo4j/password \
+    neo4j:latest
 ```
 
 ---
@@ -149,10 +259,20 @@ streamlit run openrag/ui/evaluation_dashboard/app.py
 from openrag.routers.hallucination import add_hallucination_routes
 add_hallucination_routes(app)
 
-# In RAG pipeline
+# In RAG pipeline - Hallucination Detection
 from openrag.components.hallucination import HallucinationDetector
 detector = HallucinationDetector()
 result = await detector.detect(response, sources)
+
+# In RAG pipeline - Graph RAG
+from openrag.components.graph import GraphRetriever, RetrievalMode
+retriever = GraphRetriever(graph_store, entity_extractor, vector_store)
+results = await retriever.retrieve(query, mode=RetrievalMode.HYBRID)
+
+# In RAG pipeline - Agentic RAG
+from openrag.components.agents import AgenticRAGOrchestrator
+orchestrator = AgenticRAGOrchestrator(llm, retriever, planner, tools)
+result = await orchestrator.run(complex_query)
 ```
 
 ---
