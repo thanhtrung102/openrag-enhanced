@@ -1,0 +1,48 @@
+# OpenRAG Enhanced - Core Dependencies
+# Based on linagora/openrag with evaluation extensions
+
+# Web framework
+fastapi>=0.109.0
+uvicorn[standard]>=0.27.0
+pydantic>=2.5.0
+
+# LLM & Embeddings
+openai>=1.10.0
+anthropic>=0.18.0
+transformers>=4.36.0
+sentence-transformers>=2.2.2
+torch>=2.1.0
+
+# Vector database
+pymilvus>=2.3.4
+
+# Document processing
+docling>=1.0.0
+pypdf>=3.17.0
+python-docx>=1.1.0
+python-pptx>=0.6.23
+
+# Text processing
+nltk>=3.8.1
+spacy>=3.7.0
+
+# Database
+asyncpg>=0.29.0
+sqlalchemy>=2.0.25
+psycopg2-binary>=2.9.9
+
+# Graph database
+neo4j>=5.15.0
+
+# Async
+aiohttp>=3.9.0
+httpx>=0.26.0
+
+# Utilities
+python-dotenv>=1.0.0
+pyyaml>=6.0.1
+tenacity>=8.2.3
+tqdm>=4.66.0
+
+# Chainlit UI
+chainlit>=1.0.0

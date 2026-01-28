@@ -1,0 +1,27 @@
+# OpenRAG Enhanced - Dashboard Dockerfile
+FROM python:3.11-slim
+
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1
+
+WORKDIR /app
+
+# Install dependencies
+RUN pip install --no-cache-dir \
+    streamlit>=1.30.0 \
+    plotly>=5.18.0 \
+    pandas>=2.1.0 \
+    numpy>=1.26.0 \
+    psycopg2-binary>=2.9.9 \
+    httpx>=0.26.0 \
+    python-dotenv>=1.0.0
+
+# Copy dashboard code
+COPY ./src/ui /app/src/ui
+
+EXPOSE 8501
+
+HEALTHCHECK --interval=30s --timeout=10s --retries=3 \
+    CMD curl -f http://localhost:8501/healthz || exit 1
+
+CMD ["streamlit", "run", "src/ui/dashboard.py", "--server.port=8501", "--server.address=0.0.0.0"]
