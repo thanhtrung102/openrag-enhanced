@@ -1,64 +1,39 @@
-# OpenRAG Enhanced
+# OpenRAG Contributions: Hallucination Detection & Evaluation Persistence
 
-> Evaluation and Hallucination Detection Extensions for [Linagora's OpenRAG](https://github.com/linagora/openrag)
+> **Proposed contributions to [linagora/openrag](https://github.com/linagora/openrag)**
 
 [![License: AGPL-3.0](https://img.shields.io/badge/License-AGPL%203.0-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
 
 ## Overview
 
-OpenRAG Enhanced extends the OpenRAG framework with comprehensive evaluation capabilities:
+This repository contains proposed contributions to Linagora's OpenRAG framework, addressing gaps identified in the current evaluation pipeline:
 
-- **Hallucination Detection** - Multi-method detection (NLI, alignment, consistency)
-- **Automatic RAG Evaluation** - LLM-as-judge quality assessment
-- **Retrieval Metrics** - Hit Rate, MRR, NDCG evaluation
-- **Ground Truth Generation** - Automated Q&A pair creation
-- **Real-time Monitoring** - Grafana dashboards and Prometheus metrics
+| Gap in OpenRAG | Our Contribution |
+|----------------|------------------|
+| No explicit hallucination detection | **NEW:** Multi-method hallucination detector |
+| Evaluation results not persisted | **NEW:** PostgreSQL storage + dashboard |
+| No visual metrics dashboard | **NEW:** Streamlit evaluation UI |
 
-## Quick Start
+### What OpenRAG Already Has (Not Duplicated)
 
-### Prerequisites
+- ✅ Retrieval metrics (Hit Rate, MRR, NDCG, Recall)
+- ✅ LLM-as-Judge (Completion & Precision scoring)
+- ✅ Ground truth Q&A generation
+- ✅ System monitoring endpoints
 
-- Docker & Docker Compose v2.20+
-- NVIDIA GPU with 16GB+ VRAM (recommended)
-- 32GB RAM
-- 100GB free disk space
+---
 
-### Setup
+## Proposed Contributions
 
-```bash
-# Clone the repository
-git clone https://github.com/your-org/openrag-enhanced.git
-cd openrag-enhanced
+### 1. Hallucination Detection Module
 
-# Configure environment
-cp .env.example .env
-# Edit .env with your API keys and passwords
+**Location:** `openrag/components/hallucination/`
 
-# Start all services
-docker-compose up -d
-
-# Check status
-docker-compose ps
-```
-
-### Access Points
-
-| Service | URL | Description |
-|---------|-----|-------------|
-| API Docs | http://localhost:8000/docs | FastAPI Swagger UI |
-| Dashboard | http://localhost:8501 | Streamlit Evaluation Dashboard |
-| Grafana | http://localhost:3000 | Monitoring Dashboards |
-| Neo4j | http://localhost:7474 | Graph Database Browser |
-
-## Features
-
-### 1. Hallucination Detection
-
-Multi-method approach for detecting fabricated content in RAG responses:
+Multi-method hallucination detection that OpenRAG currently lacks:
 
 ```python
-from src.evaluation.hallucination_detector import HallucinationDetector
+from openrag.components.hallucination import HallucinationDetector
 
 detector = HallucinationDetector()
 result = await detector.detect(
@@ -66,227 +41,217 @@ result = await detector.detect(
     sources=["Python is a programming language created by Guido van Rossum..."]
 )
 
-print(f"Hallucination Score: {result.ensemble_score:.2f}")
-print(f"Is Hallucinated: {result.is_hallucinated}")
-print(f"Flagged Claims: {result.flagged_claims}")
+if result.is_hallucinated:
+    print(f"Warning! Flagged claims: {result.flagged_claims}")
+    print(f"Hallucination score: {result.ensemble_score:.2f}")
 ```
 
-**Detection Methods:**
-- **NLI-based**: Uses natural language inference to check entailment
-- **Alignment**: Measures semantic similarity between response and sources
-- **Consistency**: Checks for contradictions across multiple generations
+**Methods:**
+- **NLI-based:** Uses natural language inference to check if claims are entailed by sources
+- **Alignment:** Measures semantic similarity between response and source documents
+- **Ensemble:** Combines multiple methods for robust detection
 
-### 2. LLM-as-Judge Evaluation
+**API Endpoint:**
+```bash
+POST /api/v1/hallucination/detect
+{
+    "response": "Python is the fastest language in the world.",
+    "sources": ["Python is a high-level programming language..."],
+    "methods": ["nli", "alignment"],
+    "threshold": 0.5
+}
+```
 
-Automated quality assessment using GPT-4 or Claude:
+### 2. Evaluation Persistence
+
+**Location:** `openrag/storage/evaluation_store.py`
+
+Persistent storage for evaluation metrics (currently OpenRAG only prints results):
 
 ```python
-from src.evaluation.llm_judge import LLMJudgeEvaluator
+from openrag.storage import EvaluationStore
 
-judge = LLMJudgeEvaluator(judge_model="gpt-4")
-result = await judge.evaluate(
-    question="What is Python?",
-    context=["Python is a high-level programming language..."],
-    response="Python is a versatile programming language...",
+store = EvaluationStore(connection_string="postgresql://...")
+
+# Save evaluation results
+await store.save_evaluation(
+    query="What is Python?",
+    response="Python is a programming language...",
+    sources=sources,
+    metrics={
+        "hit_rate": 0.85,
+        "mrr": 0.72,
+        "hallucination_score": 0.15,
+    }
 )
 
-print(f"Faithfulness: {result.faithfulness}/5")
-print(f"Relevance: {result.answer_relevance}/5")
-print(f"Overall Score: {result.overall_score}/5")
-```
-
-**Evaluation Criteria:**
-- Faithfulness (grounding in sources)
-- Answer Relevance
-- Context Relevance
-- Completeness
-- Coherence
-
-### 3. Retrieval Evaluation
-
-Comprehensive retrieval metrics following BEIR/MTEB standards:
-
-```python
-from src.evaluation.retrieval_evaluator import RetrievalEvaluator
-
-evaluator = RetrievalEvaluator(k_values=[1, 3, 5, 10, 20])
-metrics = await evaluator.evaluate(
-    retriever=my_retriever,
-    ground_truth=ground_truth_data,
+# Query historical results
+summary = await store.get_summary(
+    start_date="2024-01-01",
+    group_by="model_name"
 )
-
-print(f"Hit Rate @5: {metrics.hit_rate[5]:.2%}")
-print(f"MRR: {metrics.mrr:.3f}")
-print(f"NDCG @10: {metrics.ndcg[10]:.3f}")
 ```
 
-### 4. Ground Truth Generation
+### 3. Evaluation Dashboard
 
-Automated Q&A pair generation for evaluation:
+**Location:** `openrag/ui/evaluation_dashboard/`
 
-```python
-from src.evaluation.ground_truth_generator import GroundTruthGenerator
+Streamlit dashboard for visualizing evaluation metrics:
 
-generator = GroundTruthGenerator(llm_model="gpt-4")
-dataset = await generator.generate_from_documents(
-    documents=my_documents,
-    n_per_doc=5,
-    question_types=["factual", "reasoning"],
-)
+- Real-time hallucination rate monitoring
+- Model comparison charts
+- Historical trend analysis
+- Query-level drill-down
 
-generator.save_dataset(dataset, "ground_truth.json")
+---
+
+## Project Structure (For PR)
+
+```
+openrag/                              # Files to add to linagora/openrag
+├── components/
+│   └── hallucination/               # PR #1: Hallucination Detection
+│       ├── __init__.py
+│       ├── detector.py              # Main HallucinationDetector class
+│       ├── nli_checker.py           # NLI-based detection
+│       └── alignment_checker.py     # Semantic alignment detection
+├── storage/
+│   └── evaluation_store.py          # PR #2: Metrics Persistence
+├── routers/
+│   └── hallucination.py             # PR #1: API endpoints
+└── ui/
+    └── evaluation_dashboard/        # PR #3: Streamlit Dashboard
+        └── app.py
+
+sql/
+└── evaluation_schema.sql            # PR #2: PostgreSQL schema
+
+# Supporting files (standalone testing)
+src/                                 # Original standalone implementation
+docker-compose.yml                   # Full stack for testing
 ```
 
-## API Reference
+---
 
-### Evaluation Endpoints
+## Pull Request Plan
+
+### PR #1: Hallucination Detection
+```
+Title: feat(evaluation): Add hallucination detection module
+
+Files:
+- openrag/components/hallucination/__init__.py
+- openrag/components/hallucination/detector.py
+- openrag/components/hallucination/nli_checker.py
+- openrag/components/hallucination/alignment_checker.py
+- openrag/routers/hallucination.py
+- tests/test_hallucination.py
+```
+
+### PR #2: Evaluation Persistence
+```
+Title: feat(evaluation): Add metrics persistence with PostgreSQL
+
+Files:
+- openrag/storage/evaluation_store.py
+- sql/evaluation_schema.sql
+- automatic-evaluation-pipeline/benchmark.py (modify)
+```
+
+### PR #3: Evaluation Dashboard
+```
+Title: feat(ui): Add Streamlit evaluation dashboard
+
+Files:
+- openrag/ui/evaluation_dashboard/app.py
+- openrag/ui/evaluation_dashboard/requirements.txt
+```
+
+---
+
+## Local Development & Testing
 
 ```bash
-# Single evaluation
-POST /api/v1/evaluate
-{
-    "query": "What is RAG?",
-    "context": ["RAG stands for..."],
-    "response": "RAG is...",
-    "evaluate_hallucination": true,
-    "evaluate_quality": true
-}
-
-# Batch evaluation
-POST /api/v1/evaluate/batch
-{
-    "items": [...],
-    "parallel": true
-}
-
-# Hallucination detection only
-POST /api/v1/detect/hallucination
-{
-    "response": "...",
-    "sources": ["..."]
-}
-
-# Retrieval evaluation
-POST /api/v1/evaluate/retrieval
-{
-    "results": [...],
-    "ground_truth": [...]
-}
-```
-
-## Project Structure
-
-```
-openrag-enhanced/
-├── src/
-│   ├── api/                    # FastAPI endpoints
-│   │   └── main.py
-│   ├── evaluation/             # Evaluation framework
-│   │   ├── hallucination_detector.py
-│   │   ├── llm_judge.py
-│   │   ├── retrieval_evaluator.py
-│   │   └── ground_truth_generator.py
-│   ├── ui/                     # User interfaces
-│   │   └── dashboard.py        # Streamlit dashboard
-│   └── monitoring/             # Metrics & logging
-├── sql/
-│   └── init_evaluation.sql     # PostgreSQL schema
-├── grafana/
-│   └── datasources/
-├── prometheus/
-│   └── prometheus.yml
-├── tests/
-├── docker-compose.yml
-├── Dockerfile.backend
-├── Dockerfile.dashboard
-├── requirements.txt
-├── requirements-eval.txt
-└── README.md
-```
-
-## Configuration
-
-### Environment Variables
-
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `POSTGRES_PASSWORD` | PostgreSQL password | - |
-| `NEO4J_PASSWORD` | Neo4j password | - |
-| `OPENAI_API_KEY` | OpenAI API key | - |
-| `ANTHROPIC_API_KEY` | Anthropic API key | - |
-| `LLM_JUDGE_MODEL` | Model for evaluation | gpt-4 |
-| `HALLUCINATION_THRESHOLD` | Detection threshold | 0.5 |
-
-## LLM Zoomcamp Evaluation Criteria
-
-This project addresses all evaluation criteria:
-
-| Criterion | Points | Implementation |
-|-----------|--------|----------------|
-| Problem Description | 2/2 | Comprehensive docs |
-| RAG Flow | 2/2 | Full pipeline with evaluation |
-| Retrieval Evaluation | 2/2 | Hit Rate, MRR, NDCG |
-| RAG Evaluation | 2/2 | LLM-as-Judge + hallucination |
-| Interface | 2/2 | Streamlit + FastAPI |
-| Ingestion Pipeline | 2/2 | Ground truth generation |
-| Monitoring | 2/2 | Grafana + PostgreSQL |
-| Containerization | 2/2 | Full Docker Compose |
-| Reproducibility | 2/2 | Complete documentation |
-| **Best Practices** | 3/3 | Hybrid search, reranking |
-
-## Development
-
-### Running Tests
-
-```bash
-# Unit tests
-docker-compose exec openrag-backend pytest tests/unit/ -v
-
-# Integration tests
-docker-compose exec openrag-backend pytest tests/integration/ -v
-
-# With coverage
-docker-compose exec openrag-backend pytest --cov=src tests/
-```
-
-### Local Development
-
-```bash
-# Create virtual environment
-python -m venv venv
-source venv/bin/activate  # Linux/Mac
-# or: venv\Scripts\activate  # Windows
+# Clone this repository
+git clone https://github.com/thanhtrung102/openrag-enhanced.git
+cd openrag-enhanced
 
 # Install dependencies
 pip install -r requirements.txt
 pip install -r requirements-eval.txt
 
-# Run API locally
-uvicorn src.api.main:app --reload
+# Run tests
+pytest tests/ -v
 
-# Run dashboard locally
-streamlit run src/ui/dashboard.py
+# Start full stack (for integration testing)
+docker-compose up -d
+
+# Access services
+# - API: http://localhost:8000/docs
+# - Dashboard: http://localhost:8501
 ```
 
-## Contributing
+---
 
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Run tests
-5. Submit a pull request
+## Integration with OpenRAG
+
+To add hallucination detection to existing OpenRAG installation:
+
+```python
+# In openrag/api.py
+from openrag.routers.hallucination import add_hallucination_routes
+
+app = FastAPI(...)
+
+# Add hallucination detection routes
+add_hallucination_routes(app)
+```
+
+To integrate with RAG pipeline:
+
+```python
+# In openrag/components/pipeline.py
+from openrag.components.hallucination import HallucinationDetector
+
+detector = HallucinationDetector()
+
+async def generate_with_detection(query: str, context: List[str]):
+    response = await llm.generate(query, context)
+
+    # Check for hallucinations
+    detection = await detector.detect(response, context)
+
+    return {
+        "response": response,
+        "hallucination_score": detection.ensemble_score,
+        "is_hallucinated": detection.is_hallucinated,
+        "flagged_claims": detection.flagged_claims,
+    }
+```
+
+---
+
+## Alignment with OpenRAG Roadmap
+
+From OpenRAG's README, upcoming features include:
+- **Tool Calling** → Future contribution
+- **Agentic RAG** → Future contribution
+- **MCP Integration** → Future contribution
+
+Our hallucination detection directly supports quality assurance for these advanced features.
+
+---
 
 ## License
 
-AGPL-3.0 - See [LICENSE](LICENSE) for details.
+AGPL-3.0 - Aligned with [linagora/openrag](https://github.com/linagora/openrag)
 
 ## Acknowledgments
 
 - [Linagora OpenRAG](https://github.com/linagora/openrag) - Base RAG framework
+- [Linagora AI Department](https://linagora.com) - Internship opportunity
 - [DataTalksClub LLM Zoomcamp](https://github.com/DataTalksClub/llm-zoomcamp) - Project format
-- [HaluEval](https://github.com/RUCAIBox/HaluEval) - Hallucination benchmark
-- [RAGAS](https://github.com/explodinggradients/ragas) - RAG evaluation inspiration
 
 ---
 
-**OpenRAG Enhanced** - Linagora AI Department Internship Project
+**Linagora AI Department Internship Project** | thanhtrung102
