@@ -1,0 +1,16 @@
+# OpenRAG Evaluation Dashboard Dependencies
+
+# Core
+streamlit>=1.30.0
+plotly>=5.18.0
+pandas>=2.1.0
+numpy>=1.26.0
+
+# Database
+psycopg2-binary>=2.9.9
+
+# HTTP client
+httpx>=0.26.0
+
+# Environment
+python-dotenv>=1.0.0
